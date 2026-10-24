@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Weekly, so drift in the base image or the runner's packages fails a run without a code
+  # change. The tests that hit YouTube stay off: it blocks CI runners' addresses.
+  schedule:
+    - cron: "23 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.14"
+      # ffmpeg makes the test audio and cuts it; epubcheck validates the EPUB for real.
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg epubcheck
+      # Two steps: hash-checking mode applies to a whole pip install, and the dev tools
+      # aren't hashed.
+      - run: pip install --require-hashes -r requirements.txt
+      - run: pip install '.[dev]'
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest -rs
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          file: Containerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

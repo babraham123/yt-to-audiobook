@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yt-to-audiobook"
+version = "0.1.0"
+description = "Turn a YouTube video into a read-along EPUB: its audio and captions, synced"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "mutagen",
+    "yt-dlp",
+    # The JS challenge solver, run by node. yt-dlp skips a version other than the one its
+    # `default` extra names; Renovate bumps the two together, and test_dependencies.py fails
+    # a bump that splits them.
+    "yt-dlp-ejs==0.8.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+yt-to-audiobook = "yt_to_audiobook.cli:main"
+
+[project.urls]
+Source = "https://github.com/babraham123/yt-to-audiobook"
+
+[tool.setuptools]
+packages = ["yt_to_audiobook"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["network: fetches from YouTube; run with -m network"]
+addopts = "-m 'not network'"
+
+[tool.ruff]
+line-length = 100
