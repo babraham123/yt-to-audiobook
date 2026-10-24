@@ -96,14 +96,15 @@ def build_epub(path, meta, audio, cover, parts, lang):
     for i, (title, cues) in enumerate(parts, 1):
         name = f"ch{i:03}"
         doc, body = xhtml_doc(title, lang)
-        section = sub(body, "section", epub__type="chapter")
+        # A fragment on the textref: epubcheck 4.2 (Ubuntu's) rejects a bare file reference.
+        section = sub(body, "section", epub__type="chapter", id=name)
         sub(section, "h2", title, id=f"{name}-title")
         smil = ET.Element("smil", {"xmlns": SMIL, "xmlns:epub": OPS, "version": "3.0"})
         seq = sub(
             sub(smil, "body"),
             "seq",
             id=f"{name}-seq",
-            epub__textref=f"../text/{name}.xhtml",
+            epub__textref=f"../text/{name}.xhtml#{name}",
             epub__type="chapter",
         )
         for c in cues:
