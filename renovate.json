@@ -5,10 +5,14 @@
     "docker:pinDigests",
     "helpers:pinGitHubActionDigests"
   ],
-  "schedule": ["before 6am on monday"],
+  "schedule": [
+    "before 6am on monday"
+  ],
   "minimumReleaseAge": "3 days",
   "pip-compile": {
-    "managerFilePatterns": ["/(^|/)requirements\\.txt$/"]
+    "managerFilePatterns": [
+      "/(^|/)requirements\\.txt$/"
+    ]
   },
   "pip_requirements": {
     "enabled": false
@@ -16,18 +20,28 @@
   "pep621": {
     "enabled": false
   },
+  "poetry": {
+    "enabled": false
+  },
   "packageRules": [
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "GitHub Actions"
     },
     {
-      "matchManagers": ["dockerfile"],
+      "matchManagers": [
+        "dockerfile"
+      ],
       "groupName": "container base images"
     },
     {
       "description": "yt-dlp skips a yt-dlp-ejs other than the one it pins, so they move together",
-      "matchPackageNames": ["yt-dlp", "yt-dlp-ejs"],
+      "matchPackageNames": [
+        "yt-dlp",
+        "yt-dlp-ejs"
+      ],
       "groupName": "yt-dlp"
     }
   ]
