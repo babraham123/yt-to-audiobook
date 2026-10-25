@@ -59,5 +59,6 @@ _Avoid_: log, summary, metadata
 
 **Request**:
 What a caller asks for: a URL, a caption language and the SponsorBlock categories to cut. A
-queue of requests, and what happens to a failed one, belong to the caller.
+queue of requests, and what happens to a failed one, belong to the caller; the batch runner's
+queue is an inbox of `<slug>.json` files.
 _Avoid_: job, task

@@ -53,6 +53,38 @@ report = convert("https://www.youtube.com/watch?v=...", "talk.epub", lang="en", 
 `convert()` returns the report (below) and raises `Failure`, or its subclass `NoCaptions`. A
 caller's own signal handler calls `stop_child()` to end the running yt-dlp or ffmpeg.
 
+## Batch runner
+
+`batch/yt_to_audiobook_batch.py`, in the image as `/opt/yt_to_audiobook_batch.py`, works through
+an inbox one request per run: it converts the oldest, delivers the EPUB and its report, and posts
+the outcome to ntfy. Run it as the container's entrypoint and start it again (a systemd path unit
+on the inbox and a timer, say) until the inbox is empty.
+
+```bash
+podman run --rm -v ./videos:/videos -v ./readalouds:/readalouds \
+    --entrypoint python3 yt-to-audiobook /opt/yt_to_audiobook_batch.py
+```
+
+A request is `<slug>.json` in `inbox/`: `{"url", "title", "linkding_id", "lang"}`, of which only
+`url` is required. `lang` defaults to `en`, and `linkding_id` is copied into the report. A run:
+
+- converts the request with `work/<slug>/` as its work directory and delivers
+  `<slug>.readaloud.epub` and `<slug>.report.json` to `videos/<slug>/` under the readalouds
+  directory, the report first, so a reader importing the directory never sees the EPUB alone;
+- on any failure, moves the request and its work directory to `failed/<slug>/`, so a path unit
+  watching the inbox doesn't start it again in a loop;
+- on SIGTERM or Ctrl-C, leaves the request in the inbox and `work/<slug>/` in place, and the next
+  run resumes the download.
+
+It exits 0 when the request is done or the inbox is empty, 1 when the request failed.
+
+| Variable | Default | |
+|----------|---------|---|
+| `VIDEOS_DIR` | `/videos` | holds `inbox/`, `work/` and `failed/` |
+| `READALOUDS_DIR` | `/readalouds` | delivers to `videos/<slug>/` under it |
+| `READALOUDS_OWNER` | `0:0` | `UID:GID` the delivered files and their directories belong to |
+| `NTFY_URL`, `NTFY_ALERT_ACCESS_TOKEN` | unset | the ntfy topic URL and bearer token; no post without both |
+
 ## How it works
 
 1. **Fetch**: yt-dlp downloads the `m4a` audio track, the captions in `<lang>` and
@@ -131,5 +163,4 @@ pytest -m network   # converts a real 19-second video
 ## Used by
 
 The [homelab](https://github.com/babraham123/homelab) builds the image from `main` with its image
-updater and runs it with its own batch runner, which adds the inbox, the retries, delivery to
-Storyteller and notifications.
+updater and runs the [batch runner](#batch-runner) in it, delivering to Storyteller.
