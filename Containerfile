@@ -10,7 +10,9 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir --require-hashes -r requirements.txt
 COPY pyproject.toml README.md LICENSE ./
 COPY yt_to_audiobook ./yt_to_audiobook
-RUN pip install --no-cache-dir --no-deps . && rm -rf /src
+# pip goes last: nothing installs at run time, and its vendored urllib3 and msgpack would
+# fail the scan gate.
+RUN pip install --no-cache-dir --no-deps . && rm -rf /src && pip uninstall -y pip
 # The batch runner: one request from an inbox per run, as an alternative entrypoint.
 COPY batch/yt_to_audiobook_batch.py /opt/
 WORKDIR /
