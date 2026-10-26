@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
-          python-version: "3.14"
+          python-version: "3.15"
       # ffmpeg makes the test audio and cuts it; epubcheck validates the EPUB for real.
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg epubcheck
       # Two steps: hash-checking mode applies to a whole pip install, and the dev tools
