@@ -4,14 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yt-to-audiobook"
-version = "0.1.0"
+version = "0.1.1"
 description = "Turn a YouTube video into a read-along EPUB: its audio and captions, synced"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "mutagen",
-    "yt-dlp",
+    # curl_cffi: yt-dlp impersonates a browser through it for YouTube's caption downloads.
+    "yt-dlp[curl-cffi]",
     # The JS challenge solver, run by node. yt-dlp skips a version other than the one its
     # `default` extra names; Renovate bumps the two together, and test_dependencies.py fails
     # a bump that splits them.

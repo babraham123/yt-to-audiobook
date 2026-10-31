@@ -59,16 +59,27 @@ FAKE_YT_DLP = textwrap.dedent(
     """\
     #!{python}
     # Stands in for yt-dlp: writes the files the spec in $FAKE_YT_DLP_SPEC describes into -P.
+    # The download writes the audio, thumbnail and info.json; a --skip-download call writes
+    # the --sub-lang tracks the spec has, and exits 1 on a track in its "throttled" list, as
+    # YouTube answers a translated track with 429.
     import json, os, subprocess, sys
     from pathlib import Path
     args = sys.argv[1:]
     wdir = Path(args[args.index("-P") + 1])
     spec = json.loads(Path(os.environ["FAKE_YT_DLP_SPEC"]).read_text())
-    Path(os.environ["FAKE_YT_DLP_ARGS"]).write_text(json.dumps(args))
+    calls = Path(os.environ["FAKE_YT_DLP_ARGS"])
+    calls.write_text(json.dumps([*json.loads(calls.read_text() or "[]"), args]))
     if spec.get("fail"):
         sys.exit(1)
     info = spec["info"]
     vid = info["id"]
+    if "--skip-download" in args:
+        for lang in args[args.index("--sub-lang") + 1].split(","):
+            if lang in spec.get("throttled", []):
+                sys.exit("ERROR: Unable to download video subtitles: HTTP Error 429")
+            if lang in spec.get("vtt", {{}}):
+                (wdir / (vid + "." + lang + ".vtt")).write_text(spec["vtt"][lang])
+        sys.exit(0)
     subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-f", "lavfi", "-i",
                     "sine=duration=%s" % spec["seconds"], "-c:a", "aac", "-f", "mp4",
                     str(wdir / (vid + ".m4a"))], check=True)
@@ -76,8 +87,6 @@ FAKE_YT_DLP = textwrap.dedent(
                     "color=c=navy:s=64x36:d=1", "-frames:v", "1", str(wdir / (vid + ".jpg"))],
                    check=True)
     (wdir / (vid + ".info.json")).write_text(json.dumps(info))
-    for lang, text in spec.get("vtt", {{}}).items():
-        (wdir / (vid + "." + lang + ".vtt")).write_text(text)
     """
 )
 
@@ -85,7 +94,7 @@ FAKE_YT_DLP = textwrap.dedent(
 @pytest.fixture
 def fake_yt_dlp(tmp_path, monkeypatch):
     """Puts the stand-in yt-dlp first on PATH; call it with the spec to serve. Returns a
-    function that reads back the arguments of the last call."""
+    function that reads back the arguments of each call so far."""
     if not HAVE_FFMPEG:
         pytest.skip("ffmpeg and ffprobe not on PATH")
     bin_dir = tmp_path / "bin"
@@ -96,6 +105,7 @@ def fake_yt_dlp(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     spec_path = tmp_path / "spec.json"
     args_path = tmp_path / "args.json"
+    args_path.write_text("[]")
     monkeypatch.setenv("FAKE_YT_DLP_SPEC", str(spec_path))
     monkeypatch.setenv("FAKE_YT_DLP_ARGS", str(args_path))
 

@@ -87,16 +87,16 @@ It exits 0 when the request is done or the inbox is empty, 1 when the request fa
 
 ## How it works
 
-1. **Fetch**: yt-dlp downloads the `m4a` audio track, the captions in `<lang>` and
-   `<lang>-orig`, the thumbnail and `info.json`, with SponsorBlock in mark mode. Nothing wider
-   than those two caption tracks: yt-dlp matches language patterns without case, so `en-[A-Z]{2}`
-   would take every auto-translation too, and YouTube answers a burst of caption requests with
-   HTTP 429.
+1. **Fetch**: yt-dlp downloads the `m4a` audio track, the thumbnail and `info.json`, with
+   SponsorBlock in mark mode. A second yt-dlp call then downloads the caption tracks
+   `info.json` lists: `<lang>` if the channel uploaded it, and `<lang>-orig`. YouTube's
+   automatic `<lang>` track is never asked for: it is a machine translation, even for a video
+   spoken in `<lang>`, and YouTube answers a translated track's download with HTTP 429. yt-dlp
+   fetches captions through curl_cffi, impersonating a browser, as YouTube expects.
 2. **Captions**, in this order:
    1. captions uploaded by the channel;
    2. `<lang>-orig`, YouTube's automatic captions in the spoken language;
-   3. any other automatic track in `<lang>`;
-   4. the speech-to-text hook (see below).
+   3. the speech-to-text hook (see below).
 
    YouTube's automatic captions roll: each cue repeats the line before it, and a 10 ms cue
    between them repeats it again. Each cue keeps only the line it adds.

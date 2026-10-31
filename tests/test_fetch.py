@@ -1,7 +1,7 @@
 import pytest
 
 from yt_to_audiobook import Failure, NoCaptions
-from yt_to_audiobook.fetch import check_request, pick_captions
+from yt_to_audiobook.fetch import caption_langs, check_request, pick_captions
 
 
 def tracks(tmp_path, *langs):
@@ -19,14 +19,26 @@ def test_uploaded_captions_come_first(tmp_path):
     assert pick(tmp_path, {"subtitles": {"en": []}}) == ("X.en.vtt", "uploaded", "en")
 
 
-def test_untranslated_auto_captions_beat_the_plain_auto_track(tmp_path):
+def test_untranslated_auto_captions_beat_the_translated_auto_track(tmp_path):
     tracks(tmp_path, "en", "en-orig")
     assert pick(tmp_path, {}) == ("X.en-orig.vtt", "auto", "en")
 
 
-def test_any_auto_track_when_the_original_is_missing(tmp_path):
+def test_a_translated_auto_track_alone_is_no_captions(tmp_path):
     tracks(tmp_path, "de")
-    assert pick(tmp_path, {}, lang="de") == ("X.de.vtt", "auto", "de")
+    with pytest.raises(NoCaptions):
+        pick(tmp_path, {}, lang="de")
+
+
+@pytest.mark.parametrize("info, langs", [
+    ({}, []),
+    ({"automatic_captions": {"en": [], "en-orig": []}}, ["en-orig"]),
+    ({"automatic_captions": {"en": [], "de-orig": []}}, []),
+    ({"subtitles": {"en": []}}, ["en"]),
+    ({"subtitles": {"en": []}, "automatic_captions": {"en-orig": []}}, ["en", "en-orig"]),
+])  # fmt: skip
+def test_caption_langs(info, langs):
+    assert caption_langs(info, "en") == langs
 
 
 def test_no_track_falls_to_the_stt_hook(tmp_path):

@@ -47,10 +47,11 @@
       "groupName": "container base images"
     },
     {
-      "description": "yt-dlp skips a yt-dlp-ejs other than the one it pins, so they move together",
+      "description": "yt-dlp skips a yt-dlp-ejs other than the one it pins, and a curl-cffi outside its range, so they move together",
       "matchPackageNames": [
         "yt-dlp",
-        "yt-dlp-ejs"
+        "yt-dlp-ejs",
+        "curl-cffi"
       ],
       "groupName": "yt-dlp"
     }

@@ -47,11 +47,12 @@ In the last chapter.
 
 
 def test_convert_cuts_the_sponsor_and_shifts_the_cues(tmp_path, fake_yt_dlp):
-    args = fake_yt_dlp({"info": INFO, "seconds": 30, "vtt": {"en": UPLOADED}})
+    calls = fake_yt_dlp({"info": INFO, "seconds": 30, "vtt": {"en": UPLOADED}})
     out = tmp_path / "out" / "talk.epub"
     report = convert(URL, out, workdir=tmp_path / "work")
 
-    assert args()[args().index("--sponsorblock-mark") + 1] == ",".join(DEFAULT_SPONSORBLOCK)
+    download = calls()[0]
+    assert download[download.index("--sponsorblock-mark") + 1] == ",".join(DEFAULT_SPONSORBLOCK)
     assert report["video_id"] == "vid1" and report["title"] == "A talk"
     assert report["caption_source"] == "uploaded" and report["language"] == "en"
     assert report["cues"] == 3 and report["chapters"] == 2
@@ -71,26 +72,55 @@ def test_convert_cuts_the_sponsor_and_shifts_the_cues(tmp_path, fake_yt_dlp):
 
 
 def test_no_sponsorblock_categories_cut_nothing(tmp_path, fake_yt_dlp):
-    args = fake_yt_dlp({"info": {**INFO, "sponsorblock_chapters": []}, "seconds": 30,
+    calls = fake_yt_dlp({"info": {**INFO, "sponsorblock_chapters": []}, "seconds": 30,
                         "vtt": {"en": UPLOADED}})  # fmt: skip
     report = convert(URL, tmp_path / "a.epub", sponsorblock=())
-    assert "--sponsorblock-mark" not in args()
+    assert "--sponsorblock-mark" not in calls()[0]
     assert report["cuts"] == [] and report["cues"] == 4
+
+
+AUTO = {"automatic_captions": {"en": [{"ext": "vtt"}], "en-orig": [{"ext": "vtt"}]}}
 
 
 def test_auto_captions_are_deduplicated(tmp_path, fake_yt_dlp):
     vtt = rolling_vtt([(0.5, 3.0, "one two three"), (3.01, 6.0, "four five six")])
-    fake_yt_dlp({"info": {"id": "vid2"}, "seconds": 8, "vtt": {"en-orig": vtt, "en": vtt}})
+    fake_yt_dlp({"info": {"id": "vid2", **AUTO}, "seconds": 8, "vtt": {"en-orig": vtt}})
     report = convert(URL, tmp_path / "a.epub")
     assert report["caption_source"] == "auto"
     assert report["caption_track"] == "vid2.en-orig.vtt"
     assert report["cues"] == 2
 
 
+def test_the_translated_auto_track_is_never_requested(tmp_path, fake_yt_dlp):
+    vtt = rolling_vtt([(0.5, 3.0, "one two three")])
+    spec = {"info": {"id": "vid2", **AUTO}, "seconds": 5, "vtt": {"en-orig": vtt, "en": vtt},
+            "throttled": ["en"]}  # fmt: skip
+    calls = fake_yt_dlp(spec)
+    assert convert(URL, tmp_path / "a.epub")["caption_track"] == "vid2.en-orig.vtt"
+    captions = calls()[1]
+    assert captions[captions.index("--sub-lang") + 1] == "en-orig"
+
+
+def test_uploaded_and_original_tracks_are_both_requested(tmp_path, fake_yt_dlp):
+    calls = fake_yt_dlp({"info": {**INFO, **AUTO}, "seconds": 30, "vtt": {"en": UPLOADED}})
+    assert convert(URL, tmp_path / "a.epub")["caption_source"] == "uploaded"
+    captions = calls()[1]
+    assert captions[captions.index("--sub-lang") + 1] == "en,en-orig"
+
+
+def test_a_throttled_caption_track_is_not_missing_captions(tmp_path, fake_yt_dlp):
+    fake_yt_dlp({"info": INFO, "seconds": 30, "vtt": {"en": UPLOADED}, "throttled": ["en"]})
+    with pytest.raises(Failure, match="yt-dlp exited 1") as e:
+        convert(URL, tmp_path / "a.epub")
+    assert not isinstance(e.value, NoCaptions)
+
+
 def test_no_captions_raises_and_writes_nothing(tmp_path, fake_yt_dlp):
-    fake_yt_dlp({"info": {"id": "vid3"}, "seconds": 5})
-    with pytest.raises(NoCaptions):
+    calls = fake_yt_dlp({"info": {"id": "vid3"}, "seconds": 5})
+    with pytest.raises(NoCaptions, match="no captions"):
         convert(URL, tmp_path / "a.epub", workdir=tmp_path / "work")
+    # Nothing to ask for, so no caption call.
+    assert len(calls()) == 1
     assert not (tmp_path / "a.epub").exists()
     # The work directory keeps the download for a later retry.
     assert (tmp_path / "work" / "vid3.m4a").exists()

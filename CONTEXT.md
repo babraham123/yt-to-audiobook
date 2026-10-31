@@ -8,9 +8,9 @@ cut out, and its captions as the text, highlighted as they play.
 ### Input
 
 **Track**:
-One caption file yt-dlp downloads for a video, named by its language key: `en` (uploaded or
-automatic), `en-orig` (the automatic captions in the spoken language, untranslated). Speech to
-text adds an `stt` track.
+One caption file yt-dlp downloads for a video, named by its language key: `en` (uploaded by
+the channel), `en-orig` (the automatic captions in the spoken language, untranslated). YouTube's
+automatic `en` is a translation and is never downloaded. Speech to text adds an `stt` track.
 _Avoid_: subtitle file, transcript
 
 **Caption source**:
