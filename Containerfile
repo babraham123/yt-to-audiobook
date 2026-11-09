@@ -1,6 +1,6 @@
 # The yt-to-audiobook CLI with its pinned libraries. requirements.txt pins them by hash and is
 # what Renovate updates; the package itself is installed without dependencies on top.
-FROM docker.io/library/python:3.15-alpine@sha256:d44b1254cb92329418d164b22b20d86bbd3869d48e80e09e476531a409a728bb
+FROM docker.io/library/python:3.15-alpine@sha256:a0f2e268f2ce8f3709611a90054ec6a8ae31f6251f5896b8648b9bb99835e30a
 ENV PYTHONDONTWRITEBYTECODE=1
 # ffmpeg cuts and remuxes the audio; node runs yt-dlp-ejs, the solver for YouTube's JS
 # challenges.
