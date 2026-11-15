@@ -89,7 +89,8 @@ It exits 0 when the request is done or the inbox is empty, 1 when the request fa
 
 1. **Fetch**: yt-dlp downloads the `m4a` audio track, the thumbnail and `info.json`, with
    SponsorBlock in mark mode. A second yt-dlp call then downloads the caption tracks
-   `info.json` lists: `<lang>` if the channel uploaded it, and `<lang>-orig`. YouTube's
+   `info.json` lists: `<lang>` if the channel uploaded it, and `<lang>-orig`, matched ignoring
+   case (`pt-br` finds `pt-BR`) and asked for as `info.json` spells them. YouTube's
    automatic `<lang>` track is never asked for: it is a machine translation, even for a video
    spoken in `<lang>`, and YouTube answers a translated track's download with HTTP 429. yt-dlp
    fetches captions through curl_cffi, impersonating a browser, as YouTube expects.
@@ -106,7 +107,8 @@ It exits 0 when the request is done or the inbox is empty, 1 when the request fa
    audio in one `ffmpeg -c copy` pass. Cues centred in a cut are dropped, and the rest move
    earlier by the time cut before them, so the highlight stays in sync after a sponsor read. The
    default categories are `sponsor`, `selfpromo`, `interaction`, `intro`, `outro` and `preview`.
-   `filler` stays in.
+   `filler` stays in. The `chapter` category is always marked, whatever is cut, for the EPUB's
+   chapters; it is never cut.
 4. **EPUB**: one chapter per SponsorBlock chapter segment, else per chapter of the video's own,
    else every ten minutes. Each chapter has an XHTML document with a `<p>` per cue and a SMIL
    overlay with a `<par>` per cue. The package sets `dc:title` (the video's title), `dc:creator`

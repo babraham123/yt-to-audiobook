@@ -20,11 +20,13 @@ def check_request(url, lang):
 
 def fetch(url, lang, wdir, sponsorblock=DEFAULT_SPONSORBLOCK):
     """Downloads the audio, thumbnail and info.json into wdir, then the caption tracks
-    caption_langs() picks from it; returns the parsed info.json and the m4a's path. A wdir
+    caption_tracks() picks from it; returns the parsed info.json and the m4a's path. A wdir
     from an interrupted run resumes the download."""
     # SponsorBlock in mark mode: the segments land in info.json, and cuts.py cuts the audio
     # and shifts the cues together, since yt-dlp's remove mode doesn't shift subtitles.
-    marks = ["--sponsorblock-mark", ",".join(sponsorblock)] if sponsorblock else []
+    # chapter is always marked: epub.py takes its chapters from those segments, and they are
+    # never cut.
+    marks = ["--sponsorblock-mark", ",".join(dict.fromkeys([*sponsorblock, "chapter"]))]
     run(
         [
             *YT_DLP, "-f", "ba[ext=m4a]", "--embed-metadata", "--embed-thumbnail",
@@ -42,7 +44,7 @@ def fetch(url, lang, wdir, sponsorblock=DEFAULT_SPONSORBLOCK):
         raise Failure(f"yt-dlp wrote no {audio.name}")
     # A second extraction rather than --load-info-json: the caption URLs in a resumed
     # wdir's info.json may have expired.
-    if langs := caption_langs(info, lang):
+    if langs := [t for t in caption_tracks(info, lang) if t]:
         run(
             [
                 *YT_DLP, "--skip-download", "--write-subs", "--write-auto-subs",
@@ -54,15 +56,20 @@ def fetch(url, lang, wdir, sponsorblock=DEFAULT_SPONSORBLOCK):
     return info, audio
 
 
-def caption_langs(info, lang):
-    """The tracks to download: <lang> if the channel uploaded it, and <lang>-orig, YouTube's
-    automatic captions in the spoken language. Never the automatic <lang> track: it is a
-    machine translation (from any of the video's speech tracks, even an English one for
-    lang=en), and YouTube answers a translated track's download with 429."""
-    langs = [lang] if lang in (info.get("subtitles") or {}) else []
-    if f"{lang}-orig" in (info.get("automatic_captions") or {}):
-        langs.append(f"{lang}-orig")
-    return langs
+def caption_tracks(info, lang):
+    """(uploaded, auto): info.json's keys for <lang> if the channel uploaded it, and for
+    <lang>-orig, YouTube's automatic captions in the spoken language; None for a track it
+    lacks. Never the automatic <lang> track: it is a machine translation (from any of the
+    video's speech tracks, even an English one for lang=en), and YouTube answers a
+    translated track's download with 429.
+
+    Language tags are case-insensitive, so pt-br finds YouTube's pt-BR; the key comes back
+    as info.json spells it, since yt-dlp's --sub-lang and its file names use that case."""
+
+    def key(tracks, name):
+        return next((k for k in tracks or {} if k.lower() == name.lower()), None)
+
+    return key(info.get("subtitles"), lang), key(info.get("automatic_captions"), f"{lang}-orig")
 
 
 def stt(audio, lang, wdir):
@@ -74,11 +81,7 @@ def stt(audio, lang, wdir):
 def pick_captions(info, audio, lang, wdir, stt=stt):
     """The VTT to build from, its source and its language: uploaded captions first, then the
     untranslated automatic captions, then stt(audio, lang, wdir)."""
-    vid = info["id"]
-    uploaded = wdir / f"{vid}.{lang}.vtt"
-    if lang in (info.get("subtitles") or {}) and uploaded.exists():
-        return uploaded, "uploaded", lang
-    auto = wdir / f"{vid}.{lang}-orig.vtt"
-    if auto.exists():
-        return auto, "auto", lang
+    for track, source in zip(caption_tracks(info, lang), ("uploaded", "auto")):
+        if track and (vtt := wdir / f"{info['id']}.{track}.vtt").exists():
+            return vtt, source, lang
     return stt(audio, lang, wdir), "stt", lang

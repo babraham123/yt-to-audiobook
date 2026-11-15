@@ -47,12 +47,10 @@ In the last chapter.
 
 
 def test_convert_cuts_the_sponsor_and_shifts_the_cues(tmp_path, fake_yt_dlp):
-    calls = fake_yt_dlp({"info": INFO, "seconds": 30, "vtt": {"en": UPLOADED}})
+    fake_yt_dlp({"info": INFO, "seconds": 30, "vtt": {"en": UPLOADED}})
     out = tmp_path / "out" / "talk.epub"
     report = convert(URL, out, workdir=tmp_path / "work")
 
-    download = calls()[0]
-    assert download[download.index("--sponsorblock-mark") + 1] == ",".join(DEFAULT_SPONSORBLOCK)
     assert report["video_id"] == "vid1" and report["title"] == "A talk"
     assert report["caption_source"] == "uploaded" and report["language"] == "en"
     assert report["cues"] == 3 and report["chapters"] == 2
@@ -72,11 +70,26 @@ def test_convert_cuts_the_sponsor_and_shifts_the_cues(tmp_path, fake_yt_dlp):
 
 
 def test_no_sponsorblock_categories_cut_nothing(tmp_path, fake_yt_dlp):
-    calls = fake_yt_dlp({"info": {**INFO, "sponsorblock_chapters": []}, "seconds": 30,
-                        "vtt": {"en": UPLOADED}})  # fmt: skip
+    fake_yt_dlp({"info": {**INFO, "sponsorblock_chapters": []}, "seconds": 30,
+                 "vtt": {"en": UPLOADED}})  # fmt: skip
     report = convert(URL, tmp_path / "a.epub", sponsorblock=())
-    assert "--sponsorblock-mark" not in calls()[0]
     assert report["cuts"] == [] and report["cues"] == 4
+
+
+# SponsorBlock chapter segments are marked whichever categories are cut, so the EPUB can take
+# its chapters from them.
+@pytest.mark.parametrize("sponsorblock, marks", [
+    (DEFAULT_SPONSORBLOCK, "sponsor,selfpromo,interaction,intro,outro,preview,chapter"),
+    (("sponsor",), "sponsor,chapter"),
+    (("sponsor", "chapter"), "sponsor,chapter"),
+    ((), "chapter"),
+])  # fmt: skip
+def test_sponsorblock_chapters_are_always_marked(tmp_path, fake_yt_dlp, sponsorblock, marks):
+    calls = fake_yt_dlp({"info": {**INFO, "sponsorblock_chapters": []}, "seconds": 30,
+                         "vtt": {"en": UPLOADED}})  # fmt: skip
+    convert(URL, tmp_path / "a.epub", sponsorblock=sponsorblock)
+    download = calls()[0]
+    assert download[download.index("--sponsorblock-mark") + 1] == marks
 
 
 AUTO = {"automatic_captions": {"en": [{"ext": "vtt"}], "en-orig": [{"ext": "vtt"}]}}
@@ -106,6 +119,17 @@ def test_uploaded_and_original_tracks_are_both_requested(tmp_path, fake_yt_dlp):
     assert convert(URL, tmp_path / "a.epub")["caption_source"] == "uploaded"
     captions = calls()[1]
     assert captions[captions.index("--sub-lang") + 1] == "en,en-orig"
+
+
+def test_a_language_tag_finds_its_tracks_in_any_case(tmp_path, fake_yt_dlp):
+    info = {**INFO, "subtitles": {"pt-BR": [{"ext": "vtt"}]},
+            "automatic_captions": {"pt-BR-orig": [{"ext": "vtt"}]}}  # fmt: skip
+    calls = fake_yt_dlp({"info": info, "seconds": 30, "vtt": {"pt-BR": UPLOADED}})
+    report = convert(URL, tmp_path / "a.epub", lang="pt-br")
+    captions = calls()[1]
+    assert captions[captions.index("--sub-lang") + 1] == "pt-BR,pt-BR-orig"
+    assert report["caption_source"] == "uploaded"
+    assert report["caption_track"] == "vid1.pt-BR.vtt"
 
 
 def test_a_throttled_caption_track_is_not_missing_captions(tmp_path, fake_yt_dlp):

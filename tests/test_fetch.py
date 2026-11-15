@@ -1,7 +1,7 @@
 import pytest
 
 from yt_to_audiobook import Failure, NoCaptions
-from yt_to_audiobook.fetch import caption_langs, check_request, pick_captions
+from yt_to_audiobook.fetch import caption_tracks, check_request, pick_captions
 
 
 def tracks(tmp_path, *langs):
@@ -21,24 +21,38 @@ def test_uploaded_captions_come_first(tmp_path):
 
 def test_untranslated_auto_captions_beat_the_translated_auto_track(tmp_path):
     tracks(tmp_path, "en", "en-orig")
-    assert pick(tmp_path, {}) == ("X.en-orig.vtt", "auto", "en")
+    info = {"automatic_captions": {"en": [], "en-orig": []}}
+    assert pick(tmp_path, info) == ("X.en-orig.vtt", "auto", "en")
 
 
 def test_a_translated_auto_track_alone_is_no_captions(tmp_path):
     tracks(tmp_path, "de")
     with pytest.raises(NoCaptions):
-        pick(tmp_path, {}, lang="de")
+        pick(tmp_path, {"automatic_captions": {"de": []}}, lang="de")
 
 
-@pytest.mark.parametrize("info, langs", [
-    ({}, []),
-    ({"automatic_captions": {"en": [], "en-orig": []}}, ["en-orig"]),
-    ({"automatic_captions": {"en": [], "de-orig": []}}, []),
-    ({"subtitles": {"en": []}}, ["en"]),
-    ({"subtitles": {"en": []}, "automatic_captions": {"en-orig": []}}, ["en", "en-orig"]),
+@pytest.mark.parametrize("info, track, source", [
+    ({"subtitles": {"pt-BR": []}}, "pt-BR", "uploaded"),
+    ({"automatic_captions": {"pt-BR-orig": []}}, "pt-BR-orig", "auto"),
 ])  # fmt: skip
-def test_caption_langs(info, langs):
-    assert caption_langs(info, "en") == langs
+def test_a_track_is_found_under_its_key_in_info(tmp_path, info, track, source):
+    tracks(tmp_path, track)
+    assert pick(tmp_path, info, lang="pt-br") == (f"X.{track}.vtt", source, "pt-br")
+
+
+@pytest.mark.parametrize("info, lang, found", [
+    ({}, "en", (None, None)),
+    ({"automatic_captions": {"en": [], "en-orig": []}}, "en", (None, "en-orig")),
+    ({"automatic_captions": {"en": [], "de-orig": []}}, "en", (None, None)),
+    ({"subtitles": {"en": []}}, "en", ("en", None)),
+    ({"subtitles": {"en": []}, "automatic_captions": {"en-orig": []}}, "en", ("en", "en-orig")),
+    # Language tags ignore case; the key is info.json's own.
+    ({"subtitles": {"pt-BR": []}, "automatic_captions": {"pt-BR-orig": []}}, "pt-br",
+     ("pt-BR", "pt-BR-orig")),
+    ({"subtitles": {"zh-Hant": []}}, "zh-hant", ("zh-Hant", None)),
+])  # fmt: skip
+def test_caption_tracks(info, lang, found):
+    assert caption_tracks(info, lang) == found
 
 
 def test_no_track_falls_to_the_stt_hook(tmp_path):
